@@ -1,7 +1,7 @@
 {
   "tests": [
     {
-      "name": "Run echo command",
+      "name": "Echo test",
       "method": "POST",
       "path": "/",
       "body": {"command": "echo hello"},
