@@ -1,0 +1,13 @@
+{
+  "tests": [
+    {
+      "name": "Run echo command",
+      "method": "POST",
+      "path": "/",
+      "body": {"command": "echo hello"},
+      "expectedStatus": 200,
+      "expectedBody": {"exit_code": 0},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
