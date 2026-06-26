@@ -126,6 +126,40 @@ def cmd_size(args: list) -> str:
     return f'{total} байт'
 
 
+def cmd_run(args: list) -> str:
+    if not args:
+        return 'run: укажи имя файла (.py)'
+    filename = args[0]
+    if not filename.endswith('.py'):
+        return 'run: поддерживаются только .py файлы'
+    path = safe_path(filename)
+    if not os.path.exists(path):
+        return f'run: {filename}: нет такого файла'
+    import io
+    import sys
+    import importlib.util
+    import traceback
+    stdout_capture = io.StringIO()
+    stderr_capture = io.StringIO()
+    old_stdout, old_stderr = sys.stdout, sys.stderr
+    sys.stdout, sys.stderr = stdout_capture, stderr_capture
+    exit_code = 0
+    try:
+        spec = importlib.util.spec_from_file_location('__main__', path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    except SystemExit as e:
+        exit_code = e.code if isinstance(e.code, int) else 0
+    except Exception:
+        stderr_capture.write(traceback.format_exc())
+        exit_code = 1
+    finally:
+        sys.stdout, sys.stderr = old_stdout, old_stderr
+    out = stdout_capture.getvalue()
+    err = stderr_capture.getvalue()
+    return (out + err) or '(нет вывода)'
+
+
 def cmd_help(_) -> str:
     return """\
 Доступные команды:
@@ -139,13 +173,14 @@ def cmd_help(_) -> str:
   cp <src> <dst>        — скопировать
   find [паттерн]        — найти файлы (например: find *.txt)
   size [путь]           — размер файла или папки
+  run <файл.py>         — запустить Python-скрипт
   help                  — эта справка"""
 
 
 COMMANDS = {
     'ls': cmd_ls, 'cat': cmd_cat, 'write': cmd_write, 'append': cmd_append,
     'mkdir': cmd_mkdir, 'rm': cmd_rm, 'mv': cmd_mv, 'cp': cmd_cp,
-    'find': cmd_find, 'size': cmd_size, 'help': cmd_help,
+    'find': cmd_find, 'size': cmd_size, 'run': cmd_run, 'help': cmd_help,
 }
 
 
