@@ -16,6 +16,7 @@ const Index = () => {
   const [loading, setLoading] = useState(false);
   const [cmdHistory, setCmdHistory] = useState<string[]>([]);
   const [cmdHistoryIndex, setCmdHistoryIndex] = useState(-1);
+  const [cwd, setCwd] = useState("/");
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -40,9 +41,10 @@ const Index = () => {
       const res = await fetch(BACKEND_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command: cmd }),
+        body: JSON.stringify({ command: cmd, cwd }),
       });
       const data = await res.json();
+      if (data.cwd !== undefined) setCwd(data.cwd);
       setHistory((prev) => [
         ...prev,
         {
@@ -126,7 +128,7 @@ const Index = () => {
           <div key={i} className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-[#28c840] select-none">❯</span>
-              <span className="text-[#c8c8c8]">{entry.command}</span>
+              <span className="text-[#c8c8c8] break-all">{entry.command}</span>
               <span className="ml-auto text-[#333] text-xs">{entry.timestamp}</span>
             </div>
             <pre
@@ -152,7 +154,7 @@ const Index = () => {
 
       {/* Input */}
       <div className="border-t border-[#1e1e1e] bg-[#111111] px-6 py-3 flex items-center gap-3">
-        <span className="text-[#28c840] text-sm select-none">❯</span>
+        <span className="text-[#28c840] text-sm select-none">~{cwd} ❯</span>
         <input
           ref={inputRef}
           type="text"
