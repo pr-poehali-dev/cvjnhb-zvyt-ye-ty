@@ -13,12 +13,8 @@ def ensure_base():
 
 def safe_path(path: str, cwd: str = BASE_DIR) -> str:
     if os.path.isabs(path):
-        p = os.path.realpath(os.path.join(BASE_DIR, path.lstrip('/')))
-    else:
-        p = os.path.realpath(os.path.join(cwd, path))
-    if not p.startswith(BASE_DIR):
-        raise ValueError('Доступ запрещён: путь вне рабочей директории')
-    return p
+        return os.path.realpath(path)
+    return os.path.realpath(os.path.join(cwd, path))
 
 
 def cmd_ls(args: list, cwd: str) -> str:
@@ -130,41 +126,30 @@ def cmd_size(args: list, cwd: str) -> str:
 
 
 def cmd_run(args: list, cwd: str) -> str:
+    import io, sys, traceback, runpy
     if not args:
         return 'run: укажи имя файла (.py)'
-    filename = args[0]
-    if not filename.endswith('.py'):
-        return 'run: поддерживаются только .py файлы'
-    path = safe_path(filename, cwd)
+    path = safe_path(args[0], cwd)
     if not os.path.exists(path):
-        return f'run: {filename}: нет такого файла'
-    import io
-    import sys
-    import importlib.util
-    import traceback
-    stdout_capture = io.StringIO()
-    stderr_capture = io.StringIO()
-    old_stdout, old_stderr = sys.stdout, sys.stderr
-    sys.stdout, sys.stderr = stdout_capture, stderr_capture
+        return f'run: {args[0]}: нет такого файла'
+    buf_out, buf_err = io.StringIO(), io.StringIO()
+    old_out, old_err = sys.stdout, sys.stderr
+    sys.stdout, sys.stderr = buf_out, buf_err
     exit_code = 0
     try:
-        spec = importlib.util.spec_from_file_location('__main__', path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
+        runpy.run_path(path, run_name='__main__')
     except SystemExit as e:
         exit_code = e.code if isinstance(e.code, int) else 0
     except Exception:
-        stderr_capture.write(traceback.format_exc())
+        buf_err.write(traceback.format_exc())
         exit_code = 1
     finally:
-        sys.stdout, sys.stderr = old_stdout, old_stderr
-    out = stdout_capture.getvalue()
-    err = stderr_capture.getvalue()
-    return (out + err) or '(нет вывода)'
+        sys.stdout, sys.stderr = old_out, old_err
+    return (buf_out.getvalue() + buf_err.getvalue()) or '(нет вывода)'
 
 
 def cmd_pwd(args: list, cwd: str) -> str:
-    return cwd.replace(BASE_DIR, '') or '/'
+    return cwd
 
 
 def cmd_help(args: list, cwd: str) -> str:
@@ -202,10 +187,8 @@ def handler(event: dict, context) -> dict:
     ensure_base()
     body = json.loads(event.get('body') or '{}')
     raw = body.get('command', '').strip()
-    cwd_rel = body.get('cwd', '/')
-    cwd = os.path.realpath(os.path.join(BASE_DIR, cwd_rel.lstrip('/')))
-    if not cwd.startswith(BASE_DIR):
-        cwd = BASE_DIR
+    cwd_rel = body.get('cwd', BASE_DIR)
+    cwd = os.path.realpath(cwd_rel) if os.path.isabs(cwd_rel) else os.path.realpath(os.path.join(BASE_DIR, cwd_rel))
 
     if not raw:
         return {'statusCode': 400, 'headers': {'Access-Control-Allow-Origin': '*'}, 'body': json.dumps({'error': 'Команда не указана'})}
@@ -217,21 +200,18 @@ def handler(event: dict, context) -> dict:
     new_cwd = cwd_rel
 
     if cmd == 'cd':
-        if not args or args[0] in ('~', '/'):
-            new_cwd = '/'
+        if not args or args[0] == '~':
+            new_cwd = BASE_DIR
             output, exit_code = '', 0
         else:
-            try:
-                target = safe_path(args[0], cwd)
-                if not os.path.exists(target):
-                    output, exit_code = f'cd: {args[0]}: нет такой директории', 1
-                elif not os.path.isdir(target):
-                    output, exit_code = f'cd: {args[0]}: не является директорией', 1
-                else:
-                    new_cwd = target.replace(BASE_DIR, '') or '/'
-                    output, exit_code = '', 0
-            except ValueError as e:
-                output, exit_code = str(e), 1
+            target = safe_path(args[0], cwd)
+            if not os.path.exists(target):
+                output, exit_code = f'cd: {args[0]}: нет такой директории', 1
+            elif not os.path.isdir(target):
+                output, exit_code = f'cd: {args[0]}: не является директорией', 1
+            else:
+                new_cwd = target
+                output, exit_code = '', 0
     elif cmd not in COMMANDS:
         output, exit_code = f'{cmd}: команда не найдена. Напечатай help для списка команд.', 127
     else:
