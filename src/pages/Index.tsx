@@ -8,7 +8,7 @@ interface HistoryEntry {
   timestamp: string;
 }
 
-const BACKEND_URL = ""; // будет заполнено после деплоя
+const BACKEND_URL = "https://functions.poehali.dev/efb08ca2-8c87-48b4-aac8-6b30f85f37d2";
 
 const Index = () => {
   const [command, setCommand] = useState("");

@@ -4,7 +4,7 @@
       "name": "Echo test",
       "method": "POST",
       "path": "/",
-      "body": {"command": "echo hello"},
+      "body": {"command": "help"},
       "expectedStatus": 200,
       "expectedBody": {"exit_code": 0},
       "bodyMatcher": "partial"
